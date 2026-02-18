@@ -59,7 +59,8 @@ router.post('/', upload.single('image'), validateProduct, async (req, res) => {
         name: req.body.name.trim(), category: req.body.category.trim(),
         description: (req.body.description || '').trim(),
         image: imageUrl, images, colors: colors || [], sizes: sizes || [],
-        bulk_pricing, in_stock: req.body.in_stock ?? true
+        bulk_pricing, manufacturing_time: Number(req.body.manufacturing_time) || 7,
+        in_stock: req.body.in_stock ?? true
       })
     });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to create product' }); }
@@ -79,6 +80,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     if (b.colors) updates.colors = parseField(b.colors);
     if (b.sizes) updates.sizes = parseField(b.sizes);
     if (b.bulk_pricing) updates.bulk_pricing = parseField(b.bulk_pricing);
+    if (b.manufacturing_time != null) updates.manufacturing_time = Number(b.manufacturing_time);
     if (b.images) updates.images = parseField(b.images);
 
     updates.image = req.file ? (await cloudUpload(req.file.buffer)).secure_url : b.image || existing.image;

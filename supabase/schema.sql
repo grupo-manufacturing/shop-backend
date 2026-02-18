@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS products (
     'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'
   ]::TEXT[]),
   bulk_pricing JSONB NOT NULL DEFAULT '[]',
+  manufacturing_time INTEGER NOT NULL DEFAULT 7,
   in_stock BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -42,8 +43,7 @@ CREATE TABLE IF NOT EXISTS shop_orders (
   product_id UUID NOT NULL REFERENCES products(id),
   product_name TEXT NOT NULL,
   product_image TEXT,
-  selected_color TEXT NOT NULL,
-  selected_size TEXT NOT NULL,
+  variations JSONB NOT NULL DEFAULT '[]',
   quantity INTEGER NOT NULL CHECK (quantity >= 10),
   tier TEXT NOT NULL,
   unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0),

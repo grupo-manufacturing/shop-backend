@@ -6,7 +6,7 @@ const VALID_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delive
 
 router.post('/', validateOrder, async (req, res) => {
   try {
-    const { productId, color, size, quantity, tier, customer } = req.body;
+    const { productId, variations, quantity, tier, customer } = req.body;
     const product = await db.getProductById(productId);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     if (!product.in_stock) return res.status(400).json({ error: 'Product is currently out of stock' });
@@ -16,7 +16,7 @@ router.post('/', validateOrder, async (req, res) => {
 
     const order = await db.createOrder({
       product_id: product.id, product_name: product.name, product_image: product.image,
-      selected_color: color, selected_size: size, quantity, tier,
+      variations, quantity, tier,
       unit_price: matchedTier.unitPrice, total_amount: matchedTier.unitPrice * quantity,
       customer_name: customer.fullName.trim(), customer_email: customer.email.trim().toLowerCase(),
       customer_phone: customer.phone.trim(), customer_company: customer.company?.trim() || null,

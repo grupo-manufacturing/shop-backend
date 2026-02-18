@@ -3,16 +3,33 @@ const ALLOWED_COLORS = ['White', 'Black', 'Navy', 'Gray', 'Red', 'Blue', 'Green'
 const ALLOWED_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
 
 function validateOrder(req, res, next) {
-  const { productId, color, size, quantity, tier, customer } = req.body;
+  const { productId, variations, quantity, tier, customer } = req.body;
   const e = [];
 
   if (!productId) e.push('productId is required');
-  if (!color) e.push('color is required');
-  if (!size) e.push('size is required');
   if (!tier) e.push('tier is required');
 
   if (!quantity) e.push('quantity is required');
   else if (!Number.isInteger(quantity) || quantity < 10) e.push('quantity must be a whole number >= 10');
+
+  if (!Array.isArray(variations) || variations.length === 0) {
+    e.push('variations is required (array of {color, sizes: [{size, qty}]})');
+  } else {
+    let total = 0;
+    variations.forEach((v, i) => {
+      if (!v.color) e.push(`variations[${i}].color is required`);
+      if (!Array.isArray(v.sizes) || v.sizes.length === 0) {
+        e.push(`variations[${i}].sizes must be a non-empty array`);
+      } else {
+        v.sizes.forEach((s, j) => {
+          if (!s.size) e.push(`variations[${i}].sizes[${j}].size is required`);
+          if (!Number.isInteger(s.qty) || s.qty <= 0) e.push(`variations[${i}].sizes[${j}].qty must be a positive integer`);
+          else total += s.qty;
+        });
+      }
+    });
+    if (quantity && total !== quantity) e.push(`variations total (${total}) must equal quantity (${quantity})`);
+  }
 
   if (!customer) {
     e.push('customer object is required');
@@ -33,7 +50,7 @@ function validateOrder(req, res, next) {
 }
 
 function validateProduct(req, res, next) {
-  let { name, category, image, bulk_pricing, colors, sizes } = req.body;
+  let { name, category, image, bulk_pricing, colors, sizes, manufacturing_time } = req.body;
   const e = [];
 
   if (typeof colors === 'string') try { colors = JSON.parse(colors); } catch { }
@@ -56,6 +73,11 @@ function validateProduct(req, res, next) {
   }
 
   if (!image && !req.file) e.push('image is required (upload a file or provide a URL)');
+
+  if (manufacturing_time != null) {
+    const mt = Number(manufacturing_time);
+    if (!Number.isInteger(mt) || mt < 1) e.push('manufacturing_time must be a positive integer (days)');
+  }
 
   if (!Array.isArray(bulk_pricing) || !bulk_pricing.length) {
     e.push('bulk_pricing must be a non-empty array');
