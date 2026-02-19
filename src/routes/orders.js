@@ -1,39 +1,127 @@
 const router = require('express').Router();
+const crypto = require('crypto');
 const db = require('../services/database');
+const razorpay = require('../config/razorpay');
 const { validateOrder } = require('../middleware/validate');
 
-const VALID_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+const SHIPPING_COST = 299;
+const VALID_STATUSES = [
+  'pending', 'payment_pending', 'confirmed', 'processing',
+  'shipped', 'delivered', 'cancelled', 'payment_failed'
+];
 
-router.post('/', validateOrder, async (req, res) => {
+// ─── Razorpay: create order + initiate payment ────────────────────
+router.post('/create-order', validateOrder, async (req, res) => {
   try {
     const { productId, variations, quantity, tier, customer } = req.body;
+
     const product = await db.getProductById(productId);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     if (!product.in_stock) return res.status(400).json({ error: 'Product is currently out of stock' });
 
     const matchedTier = product.bulk_pricing.find(t => t.label === tier);
     if (!matchedTier) return res.status(400).json({ error: `Invalid tier: ${tier}` });
+    const subtotal = matchedTier.unitPrice * quantity;
+    const totalAmount = subtotal + SHIPPING_COST;
+    const amountInPaise = Math.round(totalAmount * 100);
 
     const order = await db.createOrder({
       product_id: product.id, product_name: product.name, product_image: product.image,
       variations, quantity, tier,
-      unit_price: matchedTier.unitPrice, total_amount: matchedTier.unitPrice * quantity,
+      unit_price: matchedTier.unitPrice, total_amount: totalAmount,
       customer_name: customer.fullName.trim(), customer_email: customer.email.trim().toLowerCase(),
       customer_phone: customer.phone.trim(), customer_company: customer.company?.trim() || null,
       address: customer.address.trim(), city: customer.city.trim(),
-      state: customer.state.trim(), pincode: customer.pincode.trim(), status: 'pending'
+      state: customer.state.trim(), pincode: customer.pincode.trim(),
+      status: 'payment_pending', payment_status: 'pending', amount_in_paise: amountInPaise,
     });
+
+    const razorpayOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: order.order_number,
+      notes: { grupo_order_id: order.id, product_name: product.name },
+    });
+
+    await db.updatePaymentDetails(order.id, { razorpay_order_id: razorpayOrder.id });
 
     res.status(201).json({
-      message: 'Order placed successfully', order: {
-        id: order.id, orderNumber: order.order_number, productName: order.product_name,
-        quantity: order.quantity, tier: order.tier, totalAmount: order.total_amount,
-        status: order.status, createdAt: order.created_at
-      }
+      orderId: order.id,
+      orderNumber: order.order_number,
+      razorpayOrderId: razorpayOrder.id,
+      amount: amountInPaise,
+      currency: 'INR',
+      keyId: process.env.RAZORPAY_KEY_ID,
     });
-  } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to place order' }); }
+  } catch (e) {
+    console.error('[create-order]', e);
+    res.status(500).json({ error: 'Failed to create payment order' });
+  }
 });
 
+// ─── Razorpay: verify payment signature ───────────────────────────
+router.post('/verify-payment', async (req, res) => {
+  try {
+    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    if (!orderId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return res.status(400).json({ error: 'Missing required payment verification fields' });
+    }
+
+    const order = await db.getOrderById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.razorpay_order_id !== razorpayOrderId) {
+      return res.status(400).json({ error: 'Razorpay order ID mismatch' });
+    }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+
+    if (expectedSignature !== razorpaySignature) {
+      await db.updatePaymentDetails(orderId, { payment_status: 'failed', status: 'payment_failed' });
+      return res.status(400).json({ error: 'Invalid payment signature — possible tampering detected' });
+    }
+
+    const updated = await db.updatePaymentDetails(orderId, {
+      razorpay_payment_id: razorpayPaymentId,
+      razorpay_signature: razorpaySignature,
+      payment_status: 'paid',
+      status: 'confirmed',
+    });
+
+    res.json({
+      message: 'Payment verified successfully',
+      order: {
+        id: updated.id, orderNumber: updated.order_number, productName: updated.product_name,
+        quantity: updated.quantity, tier: updated.tier, totalAmount: updated.total_amount,
+        status: updated.status, paymentStatus: updated.payment_status, createdAt: updated.created_at,
+      },
+    });
+  } catch (e) {
+    console.error('[verify-payment]', e);
+    res.status(500).json({ error: 'Payment verification failed' });
+  }
+});
+
+// ─── Razorpay: handle frontend-reported failure / dismissal ───────
+router.post('/payment-failed', async (req, res) => {
+  try {
+    const { orderId } = req.body;
+    if (!orderId) return res.status(400).json({ error: 'orderId is required' });
+
+    const order = await db.getOrderById(orderId);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    await db.updatePaymentDetails(orderId, { payment_status: 'failed', status: 'payment_failed' });
+    res.json({ message: 'Order marked as payment failed' });
+  } catch (e) {
+    console.error('[payment-failed]', e);
+    res.status(500).json({ error: 'Failed to update payment status' });
+  }
+});
+
+// ─── Read ─────────────────────────────────────────────────────────
 router.get('/:orderNumber', async (req, res) => {
   try {
     const order = await db.getOrderByNumber(req.params.orderNumber);
@@ -49,6 +137,7 @@ router.get('/', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to fetch orders' }); }
 });
 
+// ─── Admin: update status ─────────────────────────────────────────
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;

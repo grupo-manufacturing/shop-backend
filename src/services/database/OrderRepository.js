@@ -33,6 +33,12 @@ class OrderRepository extends BaseRepository {
     if (error) throw new Error(`Failed to update order status: ${error.message}`);
     return data;
   }
+
+  async updatePaymentDetails(orderId, fields) {
+    const { data, error } = await supabase.from('shop_orders').update(fields).eq('id', orderId).select().single();
+    if (error) throw new Error(`Failed to update payment details: ${error.message}`);
+    return data;
+  }
 }
 
 module.exports = new OrderRepository();

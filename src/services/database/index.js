@@ -13,6 +13,7 @@ module.exports = {
   getOrderById: (...a) => O.getById(...a),
   getOrders: (...a) => O.getAll(...a),
   updateOrderStatus: (...a) => O.updateStatus(...a),
+  updatePaymentDetails: (...a) => O.updatePaymentDetails(...a),
   ProductRepository: P,
   OrderRepository: O,
 };

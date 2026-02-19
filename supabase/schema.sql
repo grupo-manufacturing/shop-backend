@@ -56,7 +56,19 @@ CREATE TABLE IF NOT EXISTS shop_orders (
   city TEXT NOT NULL,
   state TEXT NOT NULL,
   pincode TEXT NOT NULL CHECK (LENGTH(pincode) = 6),
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled')),
+  status TEXT DEFAULT 'pending' CHECK (status IN (
+    'pending', 'payment_pending', 'confirmed', 'processing',
+    'shipped', 'delivered', 'cancelled', 'payment_failed'
+  )),
+
+  -- Razorpay payment fields
+  razorpay_order_id TEXT,
+  razorpay_payment_id TEXT,
+  razorpay_signature TEXT,
+  payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
+  payment_method TEXT,
+  amount_in_paise INTEGER,
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -73,6 +85,8 @@ CREATE INDEX IF NOT EXISTS idx_shop_orders_product_id ON shop_orders(product_id)
 CREATE INDEX IF NOT EXISTS idx_shop_orders_status ON shop_orders(status);
 CREATE INDEX IF NOT EXISTS idx_shop_orders_customer_email ON shop_orders(customer_email);
 CREATE INDEX IF NOT EXISTS idx_shop_orders_created_at ON shop_orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_shop_orders_razorpay_order_id ON shop_orders(razorpay_order_id);
+CREATE INDEX IF NOT EXISTS idx_shop_orders_payment_status ON shop_orders(payment_status);
 
 -- ============================================
 -- TRIGGERS
