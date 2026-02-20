@@ -39,6 +39,19 @@ class OrderRepository extends BaseRepository {
     if (error) throw new Error(`Failed to update payment details: ${error.message}`);
     return data;
   }
+
+  async cancelExpiredOrders(expiryMs = 30 * 60 * 1000) {
+    const cutoff = new Date(Date.now() - expiryMs).toISOString();
+    const { data, error } = await supabase
+      .from('shop_orders')
+      .update({ status: 'cancelled', payment_status: 'failed' })
+      .eq('status', 'payment_pending')
+      .eq('payment_status', 'pending')
+      .lt('created_at', cutoff)
+      .select('id, order_number');
+    if (error) throw new Error(`Failed to cancel expired orders: ${error.message}`);
+    return data || [];
+  }
 }
 
 module.exports = new OrderRepository();

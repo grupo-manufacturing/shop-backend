@@ -14,6 +14,7 @@ module.exports = {
   getOrders: (...a) => O.getAll(...a),
   updateOrderStatus: (...a) => O.updateStatus(...a),
   updatePaymentDetails: (...a) => O.updatePaymentDetails(...a),
+  cancelExpiredOrders: (...a) => O.cancelExpiredOrders(...a),
   ProductRepository: P,
   OrderRepository: O,
 };

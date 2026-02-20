@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS shop_orders (
   )),
 
   -- Razorpay payment fields
-  razorpay_order_id TEXT,
-  razorpay_payment_id TEXT,
+  razorpay_order_id TEXT UNIQUE,
+  razorpay_payment_id TEXT UNIQUE,
   razorpay_signature TEXT,
   payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
   payment_method TEXT,

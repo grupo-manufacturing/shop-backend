@@ -1,17 +1,27 @@
 const router = require('express').Router();
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const db = require('../services/database');
 const razorpay = require('../config/razorpay');
 const { validateOrder } = require('../middleware/validate');
 
 const SHIPPING_COST = 299;
+const ORDER_EXPIRY_MS = 30 * 60 * 1000;
+
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many payment requests — please wait a minute before trying again' },
+});
 const VALID_STATUSES = [
   'pending', 'payment_pending', 'confirmed', 'processing',
   'shipped', 'delivered', 'cancelled', 'payment_failed'
 ];
 
 // ─── Razorpay: create order + initiate payment ────────────────────
-router.post('/create-order', validateOrder, async (req, res) => {
+router.post('/create-order', paymentLimiter, validateOrder, async (req, res) => {
   try {
     const { productId, variations, quantity, tier, customer } = req.body;
 
@@ -40,6 +50,7 @@ router.post('/create-order', validateOrder, async (req, res) => {
       amount: amountInPaise,
       currency: 'INR',
       receipt: order.order_number,
+      partial_payment: false,
       notes: { grupo_order_id: order.id, product_name: product.name },
     });
 
@@ -60,7 +71,7 @@ router.post('/create-order', validateOrder, async (req, res) => {
 });
 
 // ─── Razorpay: verify payment signature ───────────────────────────
-router.post('/verify-payment', async (req, res) => {
+router.post('/verify-payment', paymentLimiter, async (req, res) => {
   try {
     const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
     if (!orderId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
@@ -69,6 +80,22 @@ router.post('/verify-payment', async (req, res) => {
 
     const order = await db.getOrderById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.payment_status === 'paid') {
+      return res.json({
+        message: 'Payment already verified',
+        order: {
+          id: order.id, orderNumber: order.order_number, productName: order.product_name,
+          quantity: order.quantity, tier: order.tier, totalAmount: order.total_amount,
+          status: order.status, paymentStatus: order.payment_status, createdAt: order.created_at,
+        },
+      });
+    }
+    const orderAge = Date.now() - new Date(order.created_at).getTime();
+    if (orderAge > ORDER_EXPIRY_MS) {
+      await db.updatePaymentDetails(orderId, { payment_status: 'failed', status: 'cancelled' });
+      return res.status(400).json({ error: 'Order has expired — please create a new order' });
+    }
+
     if (order.razorpay_order_id !== razorpayOrderId) {
       return res.status(400).json({ error: 'Razorpay order ID mismatch' });
     }
@@ -83,10 +110,25 @@ router.post('/verify-payment', async (req, res) => {
       return res.status(400).json({ error: 'Invalid payment signature — possible tampering detected' });
     }
 
+    const payment = await razorpay.payments.fetch(razorpayPaymentId);
+    if (payment.status !== 'captured') {
+      await db.updatePaymentDetails(orderId, { razorpay_payment_id: razorpayPaymentId, payment_status: 'failed', status: 'payment_failed' });
+      return res.status(400).json({ error: `Payment not captured — status is "${payment.status}"` });
+    }
+    if (payment.amount !== order.amount_in_paise) {
+      await db.updatePaymentDetails(orderId, { razorpay_payment_id: razorpayPaymentId, payment_status: 'failed', status: 'payment_failed' });
+      return res.status(400).json({ error: `Amount mismatch — expected ${order.amount_in_paise} paise, got ${payment.amount} paise` });
+    }
+    if (payment.currency !== 'INR') {
+      await db.updatePaymentDetails(orderId, { razorpay_payment_id: razorpayPaymentId, payment_status: 'failed', status: 'payment_failed' });
+      return res.status(400).json({ error: `Currency mismatch — expected INR, got ${payment.currency}` });
+    }
+
     const updated = await db.updatePaymentDetails(orderId, {
       razorpay_payment_id: razorpayPaymentId,
       razorpay_signature: razorpaySignature,
       payment_status: 'paid',
+      payment_method: payment.method || null,
       status: 'confirmed',
     });
 
@@ -112,6 +154,9 @@ router.post('/payment-failed', async (req, res) => {
 
     const order = await db.getOrderById(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (order.payment_status === 'paid') {
+      return res.json({ message: 'Order is already paid — cannot mark as failed' });
+    }
 
     await db.updatePaymentDetails(orderId, { payment_status: 'failed', status: 'payment_failed' });
     res.json({ message: 'Order marked as payment failed' });

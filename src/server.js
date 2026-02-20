@@ -48,6 +48,19 @@ app.listen(PORT, () => {
   console.log(`Grupo Shop Backend running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+
+  const db = require('./services/database');
+  const CLEANUP_INTERVAL = 5 * 60 * 1000;
+  setInterval(async () => {
+    try {
+      const cancelled = await db.cancelExpiredOrders();
+      if (cancelled.length) {
+        console.log(`[cleanup] Cancelled ${cancelled.length} expired order(s):`, cancelled.map(o => o.order_number).join(', '));
+      }
+    } catch (e) {
+      console.error('[cleanup] Failed to cancel expired orders:', e.message);
+    }
+  }, CLEANUP_INTERVAL);
 });
 
 module.exports = app;
