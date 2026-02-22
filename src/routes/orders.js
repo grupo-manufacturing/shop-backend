@@ -166,7 +166,33 @@ router.post('/payment-failed', async (req, res) => {
   }
 });
 
-// ─── Read ─────────────────────────────────────────────────────────
+// ─── Customer-facing order tracking (sanitised) ──────────────────
+router.get('/track/:orderNumber', async (req, res) => {
+  try {
+    const order = await db.getOrderByNumber(req.params.orderNumber);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    res.json({
+      order: {
+        orderNumber:   order.order_number,
+        productName:   order.product_name,
+        productImage:  order.product_image,
+        variations:    order.variations,
+        quantity:      order.quantity,
+        tier:          order.tier,
+        unitPrice:     order.unit_price,
+        totalAmount:   order.total_amount,
+        status:        order.status,
+        city:          order.city,
+        state:         order.state,
+        createdAt:     order.created_at,
+        updatedAt:     order.updated_at,
+      },
+    });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to fetch order' }); }
+});
+
+// ─── Read (admin) ─────────────────────────────────────────────────
 router.get('/:orderNumber', async (req, res) => {
   try {
     const order = await db.getOrderByNumber(req.params.orderNumber);
