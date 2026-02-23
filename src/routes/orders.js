@@ -6,7 +6,7 @@ const razorpay = require('../config/razorpay');
 const { validateOrder } = require('../middleware/validate');
 const whatsapp = require('../services/whatsappNotifier');
 
-const SHIPPING_COST = 299;
+const TIER_SHIPPING = { Standard: 1500, Silver: 2000, Gold: 4500 };
 const ORDER_EXPIRY_MS = 30 * 60 * 1000;
 
 const paymentLimiter = rateLimit({
@@ -33,7 +33,8 @@ router.post('/create-order', paymentLimiter, validateOrder, async (req, res) => 
     const matchedTier = product.bulk_pricing.find(t => t.label === tier);
     if (!matchedTier) return res.status(400).json({ error: `Invalid tier: ${tier}` });
     const subtotal = matchedTier.unitPrice * quantity;
-    const totalAmount = subtotal + SHIPPING_COST;
+    const shippingCost = TIER_SHIPPING[tier] ?? 1500;
+    const totalAmount = subtotal + shippingCost;
     const amountInPaise = Math.round(totalAmount * 100);
 
     const order = await db.createOrder({
