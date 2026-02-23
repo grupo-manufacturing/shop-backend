@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../services/database');
 const razorpay = require('../config/razorpay');
 const { validateOrder } = require('../middleware/validate');
+const whatsapp = require('../services/whatsappNotifier');
 
 const SHIPPING_COST = 299;
 const ORDER_EXPIRY_MS = 30 * 60 * 1000;
@@ -132,6 +133,8 @@ router.post('/verify-payment', paymentLimiter, async (req, res) => {
       status: 'confirmed',
     });
 
+    whatsapp.notifyOrderConfirmed(updated).catch(() => {});
+
     res.json({
       message: 'Payment verified successfully',
       order: {
@@ -209,12 +212,24 @@ router.get('/', async (req, res) => {
 });
 
 // ─── Admin: update status ─────────────────────────────────────────
+const STATUS_NOTIFIERS = {
+  shipped:   whatsapp.notifyOrderShipped,
+  delivered: whatsapp.notifyOrderDelivered,
+  cancelled: whatsapp.notifyOrderCancelled,
+};
+
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     if (!status || !VALID_STATUSES.includes(status))
       return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
-    res.json({ order: await db.updateOrderStatus(req.params.id, status) });
+
+    const order = await db.updateOrderStatus(req.params.id, status);
+
+    const notify = STATUS_NOTIFIERS[status];
+    if (notify) notify(order).catch(() => {});
+
+    res.json({ order });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to update order status' }); }
 });
 
