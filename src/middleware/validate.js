@@ -1,4 +1,21 @@
-const ALLOWED_CATEGORIES = ['T-Shirts', 'Polo', 'Hoodies', 'Sweatshirts', 'Joggers', 'Shorts', 'Caps', 'Jackets'];
+const ALLOWED_CATEGORIES = [
+  'T-Shirts',
+  'Polo',
+  'Hoodies',
+  'Sweatshirts',
+  'Joggers',
+  'Shorts',
+  'Caps',
+  'Jackets',
+  'Acid Wash T-Shirts',
+  'Jerseys',
+  'Acid Wash Hoodies',
+  'Jeans',
+  'Bowling Shirts',
+  'Plain Shirts',
+  'Denim Jackets',
+  'Leather Jackets'
+];
 const ALLOWED_COLORS = ['White', 'Black', 'Navy', 'Gray', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Pink', 'Purple', 'Brown', 'Beige', 'Maroon', 'Teal', 'Olive', 'Cream', 'Charcoal', 'Sky Blue', 'Burgundy'];
 const ALLOWED_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
 

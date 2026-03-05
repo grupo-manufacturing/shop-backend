@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS products (
   name TEXT NOT NULL,
   category TEXT NOT NULL CHECK (category IN (
     'T-Shirts', 'Polo', 'Hoodies', 'Sweatshirts',
-    'Joggers', 'Shorts', 'Caps', 'Jackets'
+    'Joggers', 'Shorts', 'Caps', 'Jackets',
+    'Acid Wash T-Shirts', 'Jerseys', 'Acid Wash Hoodies', 'Jeans',
+    'Bowling Shirts', 'Plain Shirts', 'Denim Jackets', 'Leather Jackets'
   )),
   description TEXT,
   image TEXT NOT NULL,
