@@ -14,7 +14,8 @@ const ALLOWED_CATEGORIES = [
   'Bowling Shirts',
   'Plain Shirts',
   'Denim Jackets',
-  'Leather Jackets'
+  'Leather Jackets',
+  'Crop Tops'
 ];
 const ALLOWED_COLORS = ['White', 'Black', 'Navy', 'Gray', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Pink', 'Purple', 'Brown', 'Beige', 'Maroon', 'Teal', 'Olive', 'Cream', 'Charcoal', 'Sky Blue', 'Burgundy'];
 const ALLOWED_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];

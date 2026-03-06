@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS products (
     'T-Shirts', 'Polo', 'Hoodies', 'Sweatshirts',
     'Joggers', 'Shorts', 'Caps', 'Jackets',
     'Acid Wash T-Shirts', 'Jerseys', 'Acid Wash Hoodies', 'Jeans',
-    'Bowling Shirts', 'Plain Shirts', 'Denim Jackets', 'Leather Jackets'
+    'Bowling Shirts', 'Plain Shirts', 'Denim Jackets', 'Leather Jackets',
+    'Crop Tops'
   )),
   description TEXT,
   image TEXT NOT NULL,
