@@ -32,7 +32,9 @@ router.get('/options', (req, res) =>
 
 router.get('/categories', async (req, res) => {
   try {
-    res.json({ categories: await db.getCategories() });
+    const dbCategories = await db.getCategories();
+    const mergedCategories = [...new Set([...ALLOWED_CATEGORIES, ...dbCategories])].sort((a, b) => a.localeCompare(b));
+    res.json({ categories: mergedCategories });
   } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to fetch categories' }); }
 });
 
@@ -58,12 +60,21 @@ router.post('/', upload.single('image'), validateProduct, async (req, res) => {
       product: await db.createProduct({
         name: req.body.name.trim(), category: req.body.category.trim(),
         description: (req.body.description || '').trim(),
+        size_chart_url: (req.body.size_chart_url || '').trim() || null,
         image: imageUrl, images, colors: colors || [], sizes: sizes || [],
         bulk_pricing, manufacturing_time: Number(req.body.manufacturing_time) || 7,
         in_stock: req.body.in_stock ?? true
       })
     });
-  } catch (e) { console.error(e); res.status(500).json({ error: 'Failed to create product' }); }
+  } catch (e) {
+    console.error(e);
+    if ((e.message || '').includes('violates check constraint "chk_products_category"')) {
+      return res.status(400).json({
+        error: 'Invalid category for products table. Please run the category constraint migration to include the new category.'
+      });
+    }
+    res.status(500).json({ error: 'Failed to create product' });
+  }
 });
 
 router.put('/:id', upload.single('image'), async (req, res) => {
@@ -76,6 +87,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     if (b.name) updates.name = b.name.trim();
     if (b.category) updates.category = b.category.trim();
     if (b.description != null) updates.description = b.description.trim();
+    if (b.size_chart_url !== undefined) updates.size_chart_url = (b.size_chart_url || '').trim() || null;
     if (b.in_stock != null) updates.in_stock = b.in_stock;
     if (b.colors) updates.colors = parseField(b.colors);
     if (b.sizes) updates.sizes = parseField(b.sizes);

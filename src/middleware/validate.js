@@ -15,7 +15,8 @@ const ALLOWED_CATEGORIES = [
   'Plain Shirts',
   'Denim Jackets',
   'Leather Jackets',
-  'Crop Tops'
+  'Crop Tops',
+  'Pet Clothing'
 ];
 const ALLOWED_COLORS = ['White', 'Black', 'Navy', 'Gray', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Pink', 'Purple', 'Brown', 'Beige', 'Maroon', 'Teal', 'Olive', 'Cream', 'Charcoal', 'Sky Blue', 'Burgundy'];
 const ALLOWED_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
@@ -95,6 +96,14 @@ function validateProduct(req, res, next) {
   if (manufacturing_time != null) {
     const mt = Number(manufacturing_time);
     if (!Number.isInteger(mt) || mt < 1) e.push('manufacturing_time must be a positive integer (days)');
+  }
+
+  if (req.body.size_chart_url != null && req.body.size_chart_url !== '') {
+    try {
+      new URL(req.body.size_chart_url);
+    } catch {
+      e.push('size_chart_url must be a valid URL');
+    }
   }
 
   if (!Array.isArray(bulk_pricing) || !bulk_pricing.length) {
