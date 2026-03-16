@@ -56,6 +56,16 @@ router.post('/', upload.single('image'), validateProduct, async (req, res) => {
     const bulk_pricing = parseField(req.body.bulk_pricing);
     const images = parseField(req.body.images) || [imageUrl];
 
+    let manufacturerId = req.body.manufacturer_id || null;
+    if (manufacturerId) {
+      const manufacturer = await db.getManufacturerById(manufacturerId);
+      if (!manufacturer) return res.status(400).json({ error: 'Invalid manufacturer_id' });
+    } else {
+      const fallbackManufacturer = await db.getManufacturerByName('admin_default');
+      if (!fallbackManufacturer) return res.status(500).json({ error: 'Default manufacturer is missing. Run schema migration first.' });
+      manufacturerId = fallbackManufacturer.id;
+    }
+
     res.status(201).json({
       product: await db.createProduct({
         name: req.body.name.trim(), category: req.body.category.trim(),
@@ -63,7 +73,8 @@ router.post('/', upload.single('image'), validateProduct, async (req, res) => {
         size_chart_url: (req.body.size_chart_url || '').trim() || null,
         image: imageUrl, images, colors: colors || [], sizes: sizes || [],
         bulk_pricing, manufacturing_time: Number(req.body.manufacturing_time) || 7,
-        in_stock: req.body.in_stock ?? true
+        in_stock: req.body.in_stock ?? true,
+        manufacturer_id: manufacturerId
       })
     });
   } catch (e) {
@@ -94,6 +105,11 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     if (b.bulk_pricing) updates.bulk_pricing = parseField(b.bulk_pricing);
     if (b.manufacturing_time != null) updates.manufacturing_time = Number(b.manufacturing_time);
     if (b.images) updates.images = parseField(b.images);
+    if (b.manufacturer_id) {
+      const manufacturer = await db.getManufacturerById(b.manufacturer_id);
+      if (!manufacturer) return res.status(400).json({ error: 'Invalid manufacturer_id' });
+      updates.manufacturer_id = b.manufacturer_id;
+    }
 
     updates.image = req.file ? (await cloudUpload(req.file.buffer)).secure_url : b.image || existing.image;
 

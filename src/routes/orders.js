@@ -39,6 +39,7 @@ router.post('/create-order', paymentLimiter, validateOrder, async (req, res) => 
 
     const order = await db.createOrder({
       product_id: product.id, product_name: product.name, product_image: product.image,
+      manufacturer_id: product.manufacturer_id,
       variations, quantity, tier,
       unit_price: matchedTier.unitPrice, total_amount: totalAmount,
       customer_name: customer.fullName.trim(), customer_email: customer.email.trim().toLowerCase(),

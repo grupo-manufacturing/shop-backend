@@ -36,6 +36,8 @@ app.get('/health', (req, res) => res.status(200).json({
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/manufacturer', require('./routes/manufacturer'));
 
 app.get('/', (req, res) => res.json({
   message: 'Welcome to Grupo Shop API', version: '1.0.0',

@@ -113,3 +113,73 @@ CREATE OR REPLACE TRIGGER trigger_shop_orders_updated_at
   BEFORE UPDATE ON shop_orders
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at();
+
+-- ============================================
+-- SHOP MANUFACTURERS (SIMPLE CREDENTIALS)
+-- ============================================
+CREATE TABLE IF NOT EXISTS shop_manufacturers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  phone TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL
+);
+
+ALTER TABLE shop_manufacturers ADD COLUMN IF NOT EXISTS phone TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shop_manufacturers_phone ON shop_manufacturers(phone);
+
+-- Ensure products and orders are owned by a manufacturer
+ALTER TABLE products ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS manufacturer_id UUID;
+
+-- Create a default internal manufacturer for backfill (simple password by request)
+INSERT INTO shop_manufacturers (name, phone, password)
+SELECT 'grupo_admin', '6362845356', 'admin72397'
+WHERE NOT EXISTS (
+  SELECT 1 FROM shop_manufacturers WHERE name = 'grupo_admin'
+);
+
+UPDATE shop_manufacturers
+SET phone = '6362845356'
+WHERE name = 'grupo_admin' AND (phone IS NULL OR phone = '');
+
+-- Backfill existing rows
+UPDATE products
+SET manufacturer_id = (SELECT id FROM shop_manufacturers WHERE name = 'grupo_admin')
+WHERE manufacturer_id IS NULL;
+
+UPDATE shop_orders
+SET manufacturer_id = (SELECT id FROM shop_manufacturers WHERE name = 'grupo_admin')
+WHERE manufacturer_id IS NULL;
+
+-- Add foreign key constraints (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_products_manufacturer'
+  ) THEN
+    ALTER TABLE products
+      ADD CONSTRAINT fk_products_manufacturer
+      FOREIGN KEY (manufacturer_id) REFERENCES shop_manufacturers(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_shop_orders_manufacturer'
+  ) THEN
+    ALTER TABLE shop_orders
+      ADD CONSTRAINT fk_shop_orders_manufacturer
+      FOREIGN KEY (manufacturer_id) REFERENCES shop_manufacturers(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
+ALTER TABLE products ALTER COLUMN manufacturer_id SET NOT NULL;
+ALTER TABLE shop_orders ALTER COLUMN manufacturer_id SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_products_manufacturer_id ON products(manufacturer_id);
+CREATE INDEX IF NOT EXISTS idx_shop_orders_manufacturer_id ON shop_orders(manufacturer_id);

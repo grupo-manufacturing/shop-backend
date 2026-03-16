@@ -1,5 +1,6 @@
 const P = require('./ProductRepository');
 const O = require('./OrderRepository');
+const M = require('./ManufacturerRepository');
 
 module.exports = {
   getProducts: (...a) => P.getAll(...a),
@@ -8,6 +9,13 @@ module.exports = {
   updateProduct: (...a) => P.update(...a),
   deleteProduct: (...a) => P.delete(...a),
   getCategories: (...a) => P.getCategories(...a),
+  getManufacturers: (...a) => M.getAll(...a),
+  getManufacturerById: (...a) => M.getById(...a),
+  getManufacturerByName: (...a) => M.findByName(...a),
+  getManufacturerByPhone: (...a) => M.findByPhone(...a),
+  createManufacturer: (...a) => M.create(...a),
+  updateManufacturer: (...a) => M.update(...a),
+  deleteManufacturer: (...a) => M.delete(...a),
   createOrder: (...a) => O.createOrder(...a),
   getOrderByNumber: (...a) => O.getByOrderNumber(...a),
   getOrderById: (...a) => O.getById(...a),
@@ -17,4 +25,5 @@ module.exports = {
   cancelExpiredOrders: (...a) => O.cancelExpiredOrders(...a),
   ProductRepository: P,
   OrderRepository: O,
+  ManufacturerRepository: M,
 };
